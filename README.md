@@ -1,6 +1,6 @@
 # Lugar.ph routes
 
-Jeepney routes for Philippine cities, as one GeoJSON file per city. These are the routes behind [Lugar.ph](https://github.com/andrewnyu/lugar-ph), and they're free to reuse under the [ODbL](#licence).
+Jeepney routes for Philippine cities, as one GeoJSON file per city. These are the routes behind [Lugar.ph](https://github.com/lugarph/lugar-ph), and they're free to reuse under the [ODbL](#licence).
 
 Every line is a best estimate. If you ride one and it's wrong, please fix it or tell us.
 
@@ -15,7 +15,7 @@ Every line is a best estimate. If you ride one and it's wrong, please fix it or 
 You need Python 3.10 or newer and nothing else.
 
 ```sh
-git clone https://github.com/andrewnyu/lugar-ph-routes.git
+git clone https://github.com/lugarph/lugar-ph-routes.git
 cd lugar-ph-routes
 python3 tools/serve.py
 ```
@@ -39,7 +39,7 @@ Saving sets the line's `status` to `community_verified` and recalculates `distan
 Two things to know:
 
 - **Stacked points.** Where the way out and the way back share a road, each has its own points in the same place. Moving one only moves that direction, so drag again if both directions changed.
-- **Test ride checks one line.** It follows the same one-way rule as the app, but it doesn't plan transfers. To try the full planner, run [the app](https://github.com/andrewnyu/lugar-ph#run-it) with its `data/` folder on your branch.
+- **Test ride checks one line.** It follows the same one-way rule as the app, but it doesn't plan transfers. To try the full planner, run [the app](https://github.com/lugarph/lugar-ph#run-it) with its `data/` folder on your branch.
 
 ## Open a pull request
 
@@ -129,7 +129,7 @@ Jeeps don't run both ways on the same roads, so every line is drawn one way, as 
 
 ## Add a city
 
-Add its file here and to `CITIES` in [`tools/routeformat.py`](tools/routeformat.py). Then add the city to the [app](https://github.com/andrewnyu/lugar-ph#run-it-for-your-city), which also needs its map centre and search area.
+Add its file here and to `CITIES` in [`tools/routeformat.py`](tools/routeformat.py). Then add the city to the [app](https://github.com/lugarph/lugar-ph#run-it-for-your-city), which also needs its map centre and search area.
 
 ## Licence
 
