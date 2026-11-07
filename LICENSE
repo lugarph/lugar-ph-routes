@@ -1,0 +1,14 @@
+Lugar.ph routes is made available under the Open Database License:
+https://opendatacommons.org/licenses/odbl/1-0/
+
+Any rights in individual contents of the database are licensed under the
+Database Contents License: https://opendatacommons.org/licenses/dbcl/1-0/
+
+The route files include geometry imported from OpenStreetMap,
+(c) OpenStreetMap contributors, available under the same licence.
+
+This licence covers the route files only:
+
+- The code in tools/ is under the MIT Licence; see tools/LICENSE.
+- The documents in sources/ are copies of public material and remain under
+  their publishers' terms.

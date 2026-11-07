@@ -38,10 +38,18 @@ def slug(text: str, separator: str = "-") -> str:
     return re.sub(r"[^a-z0-9]+", separator, text.lower()).strip(separator)
 
 
+def _number(value: object) -> float | int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{value!r} is not a coordinate")
+    return value
+
+
 def _clean_anchor(item: dict) -> dict:
+    """Numbers stay exactly as sent: rounding here would rewrite landmarks nobody touched."""
     name = " ".join(str(item.get("name", "")).split())
-    return {**item, "id": item.get("id") or slug(name, "_"), "name": name,
-            "lng": round(float(item["lng"]), 6), "lat": round(float(item["lat"]), 6)}
+    return {"id": item.get("id") or slug(name, "_"), "name": name,
+            "lng": _number(item["lng"]), "lat": _number(item["lat"]),
+            **{key: value for key, value in item.items() if key not in ("id", "name", "lng", "lat")}}
 
 
 def apply_line(city: str, network: dict, submitted: dict, is_new: bool, taken_ids: set[str]) -> dict:
@@ -51,7 +59,8 @@ def apply_line(city: str, network: dict, submitted: dict, is_new: bool, taken_id
     line is always marked as corrected, and the length always matches the drawing.
     """
     incoming = submitted.get("properties") or {}
-    coordinates = [[round(float(point[0]), 6), round(float(point[1]), 6)]
+    # Kept exactly as sent, for the same reason. The page rounds the points it creates.
+    coordinates = [[_number(point[0]), _number(point[1])]
                    for point in (submitted.get("geometry") or {}).get("coordinates", [])]
     existing = next((feature for feature in network["features"]
                      if feature["properties"]["id"] == incoming.get("id")), None)

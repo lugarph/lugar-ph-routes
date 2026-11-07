@@ -69,6 +69,8 @@
   .note { padding: 10px 12px; border-radius: 8px; background: var(--ground); font-size: 13px; }
   .note + .note { margin-top: 8px; }
   .savebar { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); background: #fff; }
+  .savebar[hidden] { display: none; }
+  .lines li.row { padding: 6px 8px; }
   pre { margin: 8px 0 0; padding: 10px; overflow-x: auto; border-radius: 8px; background: var(--ink); color: #fff; font-size: 12px; line-height: 1.6; }
   .pin { display: flex; align-items: center; gap: 4px; width: max-content; }
   .pin i { flex: none; width: 13px; height: 13px; border: 3px solid #fff; border-radius: 50%; background: var(--ink); box-shadow: 0 1px 4px rgba(23,33,47,.45); }
@@ -249,6 +251,16 @@ function nearestVertex(event) {
   });
   return best;
 }
+/* Where the way out and back share a road, their points stack. Prefer the one nearest along the line, so a stretch stays on one leg. */
+function vertexNearestTo(event, anchorIndex) {
+  const at = map.mouseEventToContainerPoint(event);
+  let best = null;
+  coords().forEach((point, i) => {
+    if (map.latLngToContainerPoint(latLng(point)).distanceTo(at) <= HIT_PX
+        && (best === null || Math.abs(i - anchorIndex) < Math.abs(best - anchorIndex))) best = i;
+  });
+  return best;
+}
 function nearestSegment(event) {
   if (!state.feature) return null;
   const at = map.mouseEventToContainerPoint(event);
@@ -311,19 +323,31 @@ map.on("click", (event) => {
     if (coords().length <= 2) return flash("A line needs at least two points.");
     snapshot(); coords().splice(index, 1); edited();
   } else if (state.tool === "stretch") {
-    const index = nearestVertex(dom);
+    if (state.stretchFrom === null) {
+      const index = nearestVertex(dom);
+      if (index === null) return;
+      state.stretchFrom = index; message = null; drawLine(); renderPanel();
+      return;
+    }
+    const index = vertexNearestTo(dom, state.stretchFrom);
     if (index === null) return;
-    if (state.stretchFrom === null) { state.stretchFrom = index; drawLine(); return; }
     const [first, last] = [Math.min(state.stretchFrom, index), Math.max(state.stretchFrom, index)];
     state.stretchFrom = null;
-    snapshot(); coords().splice(first + 1, last - first - 1); edited();
+    snapshot(); coords().splice(first + 1, last - first - 1);
+    message = `Removed ${last - first - 1} points. Undo brings them back.`;
+    edited();
   } else if (state.tool === "landmark") {
     addLandmark(event.latlng);
   } else if (state.tool === "ride") {
     testRide(point);
   }
 });
-map.on("zoomend moveend", () => { if (state.feature && dragging === null) drawLine(); });
+map.on("zoomend moveend", () => {
+  if (!state.feature || dragging !== null) return;
+  drawLine();
+  const hint = $("#hint");
+  if (hint) hint.textContent = hintText();
+});
 
 function addLandmark(at) {
   const properties = state.feature.properties, point = roundPoint(at);
@@ -390,6 +414,7 @@ function snapshot() {
 function undo() {
   if (!state.undo.length) return;
   state.feature = JSON.parse(state.undo.pop());
+  message = null;
   edited(state.undo.length > 0 || !state.isNew);
 }
 function edited(dirty = true) {
@@ -430,7 +455,7 @@ function closeLine() {
   location.hash = state.city || "";
 }
 const leavingIsOk = () => !state.dirty || confirm("Discard your unsaved edits to this line?");
-function openLine(id) {
+function openLine(id, keepView = false) {
   if (!leavingIsOk()) return;
   const feature = state.data.features.find((item) => item.properties.id === id);
   if (!feature) return;
@@ -440,7 +465,7 @@ function openLine(id) {
   clearRide();
   location.hash = `${state.city}/${id}`;
   drawContext(); drawGhost();
-  map.fitBounds(L.polyline(coords().map(latLng)).getBounds(), { padding: [32, 32] });
+  if (!keepView) map.fitBounds(L.polyline(coords().map(latLng)).getBounds(), { padding: [32, 32] });
   drawLine(); drawPins(); renderPanel(); queueCheck();
 }
 function newLine() {
@@ -456,7 +481,7 @@ async function save() {
     state.dirty = false;
     await loadCity(state.city, true);
     state.dirty = false;
-    openLine(id);
+    openLine(id, true);
     message = `Saved to your checkout. Nothing is shared until you open a pull request; "Your changes" has the steps.`;
     renderPanel();
   } catch (problem) { flash(problem.message); }
@@ -482,9 +507,8 @@ async function revertLine(city, id) {
 function renderPanel() {
   const panel = $("#panel");
   panel.replaceChildren();
-  if (state.view === "changes") panel.append(...changesView());
-  else if (state.feature) panel.append(...lineView());
-  else panel.append(...listView());
+  const view = state.view === "changes" ? changesView() : state.feature ? lineView() : listView();
+  panel.append(...view.filter((child) => child != null && child !== false));
   renderSavebar();
 }
 function listView() {
@@ -515,6 +539,13 @@ function listView() {
 function field(label, value, onchange, attributes = {}) {
   return h("label", { style: "margin-top:10px" }, label, h("input", { value: value ?? "", onchange: (event) => { snapshot(); onchange(event.target.value); edited(); }, ...attributes }));
 }
+function hintText() {
+  const lowZoom = coords().length > 40 && map.getZoom() < VERTEX_ZOOM && ["move", "insert", "erase", "stretch"].includes(state.tool);
+  if (lowZoom) return "Zoom in to see the points.";
+  if (state.tool === "stretch" && state.stretchFrom !== null) return "Now click the last point of the stretch.";
+  if (state.tool === "ride" && state.rideFrom) return "Now click where you'd get off.";
+  return TOOLS[state.tool][1];
+}
 function lineView() {
   const properties = state.feature.properties, points = coords();
   const committed = state.data.committed[properties.id];
@@ -529,8 +560,6 @@ function lineView() {
     } }, label));
   }
   container.classList.toggle("crosshair", ["extend", "landmark", "ride"].includes(state.tool));
-  const lowZoom = points.length > 40 && map.getZoom() < VERTEX_ZOOM && ["move", "erase", "stretch"].includes(state.tool);
-  const hint = lowZoom ? "Zoom in to see the points." : state.tool === "stretch" && state.stretchFrom !== null ? "Now click the last point of the stretch." : state.tool === "ride" && state.rideFrom ? "Now click where you'd get off." : TOOLS[state.tool][1];
   const rows = anchorRows();
   const result = state.rideResult;
   return [
@@ -542,7 +571,7 @@ function lineView() {
     message && h("p", { class: "note", style: "margin-top:10px", role: "status" }, message),
     properties.status === "osm_route_relation" && !state.dirty && h("p", { class: "note", style: "margin-top:10px" },
       "This line is imported from OpenStreetMap. If you can, fix it there too, so the next import keeps your fix and everyone else gets it."),
-    h("div", { style: "margin-top:12px" }, tools, h("p", { id: "hint", class: "muted" }, hint)),
+    h("div", { style: "margin-top:12px" }, tools, h("p", { id: "hint", class: "muted" }, hintText())),
     result && h("p", { class: "note", role: "status" }, result.bad || `Works: ${result.ride.toFixed(1)} km on the jeep, ${Math.round(result.walk * 1000)} m walking in total${result.wraps ? ", staying on past the end of the loop" : ""}.`),
     h("dl", { class: "stats", style: "margin-top:12px" },
       h("div", {}, h("dt", {}, "Length"), h("dd", {}, `${km.toFixed(2)} km`)),
@@ -591,6 +620,7 @@ async function showChanges() {
     state.dirty = false; state.feature = null;
     clearRide(); drawLine(); drawGhost(); drawPins(); drawContext();
     state.view = "changes"; message = null;
+    location.hash = state.city;
     renderPanel();
   } catch (problem) { flash(problem.message); }
 }

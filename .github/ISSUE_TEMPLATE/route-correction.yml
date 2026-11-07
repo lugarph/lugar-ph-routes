@@ -1,0 +1,35 @@
+name: Report a wrong route
+description: Tell us about a jeepney line that's wrong or missing. No map skills needed.
+title: "[Route] "
+labels: ["route correction"]
+body:
+  - type: dropdown
+    id: city
+    attributes:
+      label: City
+      options: [Baguio, Naga, Bacolod, Iloilo, Cebu, Tacloban, Cagayan de Oro, Davao, Another city]
+    validations:
+      required: true
+  - type: input
+    id: line
+    attributes:
+      label: Line
+      description: The number or the words on the jeep's signboard.
+      placeholder: 04L Bata – Libertad
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What's wrong?
+      description: Which streets does the jeep really use? Name the streets or places, and say which direction you mean.
+      placeholder: Going to Libertad, it turns at Burgos Street, not Lacson Street.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: How do you know?
+      description: A ride you took, a photo of the signboard, or a link to a route plan.
+    validations:
+      required: true

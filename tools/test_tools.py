@@ -143,12 +143,27 @@ class ApplyLineTests(unittest.TestCase):
         self.assertEqual(stored["properties"]["status"], CORRECTED_STATUS)
         self.assertEqual(len(network["features"]), 2)
 
-    def test_new_landmark_gets_an_id_and_rounded_position(self):
+    def test_new_landmark_gets_an_id_and_a_tidy_name(self):
         network = self.network()
         edit = copy.deepcopy(network["features"][0])
-        edit["properties"]["anchors"].append({"name": "  SM   City ", "lng": 122.9512345678, "lat": 10.7})
+        edit["properties"]["anchors"].append({"name": "  SM   City ", "lng": 122.951235, "lat": 10.7})
         stored = apply_line("bacolod", network, edit, False, set())
         self.assertEqual(stored["properties"]["anchors"][-1], {"id": "sm_city", "name": "SM City", "lng": 122.951235, "lat": 10.7})
+
+    def test_saving_never_rewrites_points_or_landmarks_nobody_touched(self):
+        precise = [[122.95000123456, 10.70000987654], *copy.deepcopy(LOOP[1:]), [122.95, 10.7]]
+        anchor = {"id": "a", "name": "Plaza", "lng": 122.95000123456, "lat": 10.70000987654}
+        network = {"type": "FeatureCollection", "features": [line(coordinates=precise, properties={"anchors": [anchor]})]}
+        edit = copy.deepcopy(network["features"][0])
+        edit["geometry"]["coordinates"][1] = [122.961, 10.70]
+        stored = apply_line("bacolod", network, edit, False, set())
+        self.assertEqual(stored["geometry"]["coordinates"][0], precise[0])
+        self.assertEqual(stored["properties"]["anchors"], [anchor])
+
+    def test_non_numeric_coordinates_are_refused(self):
+        edit = line(coordinates=[["122", 10.7], [122.96, 10.7]])
+        with self.assertRaises(ValueError):
+            apply_line("bacolod", self.network(), edit, True, set())
 
 
 class ServerTests(unittest.TestCase):
